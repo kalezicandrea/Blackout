@@ -3,17 +3,65 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('./config/db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 app.use('/uploads', express.static('uploads'));
 
 app.get('/', (req, res) => {
   res.send('Blackout backend is running');
+});
+
+const cocktailsUploadDir = path.join(__dirname, 'uploads', 'cocktails');
+
+if (!fs.existsSync(cocktailsUploadDir)) {
+  fs.mkdirSync(cocktailsUploadDir, { recursive: true });
+}
+
+const cocktailImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, cocktailsUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
+    cb(null, uniqueName);
+  }
+});
+
+const uploadCocktailImage = multer({
+  storage: cocktailImageStorage
+});
+
+const recipesUploadDir = path.join(__dirname, 'uploads', 'recipes');
+
+if (!fs.existsSync(recipesUploadDir)) {
+  fs.mkdirSync(recipesUploadDir, { recursive: true });
+}
+
+const recipeImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, recipesUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
+    cb(null, uniqueName);
+  }
+});
+
+const uploadRecipeImage = multer({
+  storage: recipeImageStorage
 });
 
 // =======================
@@ -318,6 +366,65 @@ app.get('/api/cocktails/random', async (req, res) => {
   }
 });
 
+app.get('/api/cocktails/by-ingredients/search', async (req, res) => {
+  try {
+    const ingredientsText = req.query.ingredients;
+
+    if (!ingredientsText) {
+      return res.status(400).json({
+        message: 'Ingredients are required'
+      });
+    }
+
+    const userIngredients = ingredientsText
+      .split(',')
+      .map(item => item.trim().toLowerCase())
+      .filter(item => item.length > 0);
+
+    if (userIngredients.length === 0) {
+      return res.status(400).json({
+        message: 'At least one ingredient is required'
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.name,
+        c.image_url,
+        c.avg_rating,
+        c.review_count,
+        d.name AS difficulty,
+        a.name AS alcohol_type,
+        COUNT(DISTINCT i.id) AS matched_ingredients
+      FROM cocktails c
+      JOIN difficulties d ON c.difficulty_id = d.id
+      JOIN alcohol_types a ON c.alcohol_type_id = a.id
+      JOIN recipe_versions rv ON rv.cocktail_id = c.id
+      JOIN recipe_ingredients ri ON ri.recipe_version_id = rv.id
+      JOIN ingredients i ON i.id = ri.ingredient_id
+      WHERE LOWER(i.name) = ANY($1)
+      GROUP BY
+        c.id,
+        c.name,
+        c.image_url,
+        c.avg_rating,
+        c.review_count,
+        d.name,
+        a.name
+      ORDER BY matched_ingredients DESC, c.avg_rating DESC, c.name ASC
+      `,
+      [userIngredients]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Cocktails by ingredients error' });
+  }
+});
+
 app.get('/api/cocktails/:id', async (req, res) => {
   try {
     const cocktailId = req.params.id;
@@ -593,6 +700,714 @@ app.post('/api/reviews/:cocktailId', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Save review error' });
+  }
+});
+
+// =======================
+// RECIPE HELPERS
+// =======================
+
+function parseJsonArray(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+async function getOrCreateIngredient(name) {
+  const cleanName = name.trim().toLowerCase();
+
+  const existingIngredient = await pool.query(
+    'SELECT id FROM ingredients WHERE name = $1',
+    [cleanName]
+  );
+
+  if (existingIngredient.rows.length > 0) {
+    return existingIngredient.rows[0].id;
+  }
+
+  const newIngredient = await pool.query(
+    `
+    INSERT INTO ingredients (name)
+    VALUES ($1)
+    RETURNING id
+    `,
+    [cleanName]
+  );
+
+  return newIngredient.rows[0].id;
+}
+
+// =======================
+// RECIPE ROUTES
+// =======================
+
+app.get('/api/recipes/my', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        rv.id,
+        rv.cocktail_id,
+        rv.name,
+        rv.description,
+        rv.image_url,
+        rv.created_at,
+        c.name AS cocktail_name
+      FROM recipe_versions rv
+      LEFT JOIN cocktails c ON rv.cocktail_id = c.id
+      WHERE rv.user_id = $1
+      ORDER BY rv.created_at DESC
+      `,
+      [user.id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'My recipes error' });
+  }
+});
+
+app.get('/api/recipes/original', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        rv.id,
+        rv.cocktail_id,
+        rv.user_id,
+        rv.name,
+        rv.description,
+        rv.image_url,
+        rv.created_at,
+        u.username AS created_by
+      FROM recipe_versions rv
+      JOIN users u ON rv.user_id = u.id
+      WHERE rv.cocktail_id IS NULL
+      ORDER BY rv.created_at DESC
+      `
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Original user recipes error' });
+  }
+});
+
+app.get('/api/recipes/:id', async (req, res) => {
+  try {
+    const recipeId = req.params.id;
+
+    const recipeResult = await pool.query(
+      `
+      SELECT
+        rv.id,
+        rv.cocktail_id,
+        rv.user_id,
+        rv.name,
+        rv.description,
+        rv.image_url,
+        rv.created_at,
+        c.name AS cocktail_name,
+        u.username AS created_by
+      FROM recipe_versions rv
+      LEFT JOIN cocktails c ON rv.cocktail_id = c.id
+      LEFT JOIN users u ON rv.user_id = u.id
+      WHERE rv.id = $1
+      `,
+      [recipeId]
+    );
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Recipe not found' });
+    }
+
+    const ingredientsResult = await pool.query(
+      `
+      SELECT
+        i.id,
+        i.name,
+        ri.quantity,
+        ri.unit
+      FROM recipe_ingredients ri
+      JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE ri.recipe_version_id = $1
+      ORDER BY i.name ASC
+      `,
+      [recipeId]
+    );
+
+    const stepsResult = await pool.query(
+      `
+      SELECT
+        id,
+        step_number,
+        text
+      FROM steps
+      WHERE recipe_version_id = $1
+      ORDER BY step_number ASC
+      `,
+      [recipeId]
+    );
+
+    res.json({
+      recipe: recipeResult.rows[0],
+      ingredients: ingredientsResult.rows,
+      steps: stepsResult.rows
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Recipe details error' });
+  }
+});
+
+app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const { cocktail_id, name, description } = req.body;
+
+    const ingredients = parseJsonArray(req.body.ingredients);
+    const steps = parseJsonArray(req.body.steps);
+
+    if (!name) {
+      return res.status(400).json({ message: 'Recipe name is required' });
+    }
+
+    const imageUrl = req.file ? `/uploads/recipes/${req.file.filename}` : null;
+
+    const newRecipe = await pool.query(
+      `
+      INSERT INTO recipe_versions (cocktail_id, user_id, name, description, image_url)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+      [
+        cocktail_id || null,
+        user.id,
+        name,
+        description || null,
+        imageUrl
+      ]
+    );
+
+    const recipeId = newRecipe.rows[0].id;
+
+    for (const item of ingredients) {
+      if (!item.name) {
+        continue;
+      }
+
+      const ingredientId = await getOrCreateIngredient(item.name);
+
+      await pool.query(
+        `
+        INSERT INTO recipe_ingredients (recipe_version_id, ingredient_id, quantity, unit)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (recipe_version_id, ingredient_id) DO NOTHING
+        `,
+        [
+          recipeId,
+          ingredientId,
+          item.quantity || null,
+          item.unit || null
+        ]
+      );
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      if (!steps[i].text) {
+        continue;
+      }
+
+      await pool.query(
+        `
+        INSERT INTO steps (recipe_version_id, step_number, text)
+        VALUES ($1, $2, $3)
+        `,
+        [
+          recipeId,
+          i + 1,
+          steps[i].text
+        ]
+      );
+    }
+
+    res.status(201).json({
+      message: 'Recipe created successfully',
+      recipe: newRecipe.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Create recipe error' });
+  }
+});
+
+app.put('/api/recipes/:id', uploadRecipeImage.single('image'), async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const recipeId = req.params.id;
+    const { cocktail_id, name, description } = req.body;
+
+    const ingredients = parseJsonArray(req.body.ingredients);
+    const steps = parseJsonArray(req.body.steps);
+
+    const recipeResult = await pool.query(
+      'SELECT * FROM recipe_versions WHERE id = $1',
+      [recipeId]
+    );
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Recipe not found' });
+    }
+
+    const recipe = recipeResult.rows[0];
+
+    if (user.role !== 'admin' && recipe.user_id !== user.id) {
+      return res.status(403).json({
+        message: 'You can edit only your own recipes'
+      });
+    }
+
+    const imageUrl = req.file
+      ? `/uploads/recipes/${req.file.filename}`
+      : recipe.image_url;
+
+    const newCocktailId = Object.prototype.hasOwnProperty.call(req.body, 'cocktail_id')
+    ? (cocktail_id ? Number(cocktail_id) : null)
+    : recipe.cocktail_id;
+
+    await pool.query(
+      `
+      UPDATE recipe_versions
+      SET cocktail_id = $1,
+          name = $2,
+          description = $3,
+          image_url = $4
+      WHERE id = $5
+      `,
+      [
+        newCocktailId,
+        name || recipe.name,
+        description !== undefined ? description : recipe.description,
+        imageUrl,
+        recipeId
+      ]
+    );
+
+    await pool.query(
+      'DELETE FROM recipe_ingredients WHERE recipe_version_id = $1',
+      [recipeId]
+    );
+
+    await pool.query(
+      'DELETE FROM steps WHERE recipe_version_id = $1',
+      [recipeId]
+    );
+
+    for (const item of ingredients) {
+      if (!item.name) {
+        continue;
+      }
+
+      const ingredientId = await getOrCreateIngredient(item.name);
+
+      await pool.query(
+        `
+        INSERT INTO recipe_ingredients (recipe_version_id, ingredient_id, quantity, unit)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (recipe_version_id, ingredient_id) DO NOTHING
+        `,
+        [
+          recipeId,
+          ingredientId,
+          item.quantity || null,
+          item.unit || null
+        ]
+      );
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      if (!steps[i].text) {
+        continue;
+      }
+
+      await pool.query(
+        `
+        INSERT INTO steps (recipe_version_id, step_number, text)
+        VALUES ($1, $2, $3)
+        `,
+        [
+          recipeId,
+          i + 1,
+          steps[i].text
+        ]
+      );
+    }
+
+    res.json({ message: 'Recipe updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Update recipe error' });
+  }
+});
+
+app.delete('/api/recipes/:id', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const recipeId = req.params.id;
+
+    const recipeResult = await pool.query(
+      'SELECT * FROM recipe_versions WHERE id = $1',
+      [recipeId]
+    );
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Recipe not found' });
+    }
+
+    const recipe = recipeResult.rows[0];
+
+    if (user.role !== 'admin' && recipe.user_id !== user.id) {
+      return res.status(403).json({
+        message: 'You can delete only your own recipes'
+      });
+    }
+
+    await pool.query(
+      'DELETE FROM recipe_versions WHERE id = $1',
+      [recipeId]
+    );
+
+    res.json({ message: 'Recipe deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete recipe error' });
+  }
+});
+
+// =======================
+// ADMIN HELPERS
+// =======================
+
+async function getAdminUser(req, res) {
+  const user = await getLoggedUser(req);
+
+  if (!user) {
+    res.status(401).json({ message: 'You must be logged in' });
+    return null;
+  }
+
+  if (user.role !== 'admin') {
+    res.status(403).json({ message: 'Admin access required' });
+    return null;
+  }
+
+  return user;
+}
+
+// =======================
+// ADMIN ROUTES
+// =======================
+
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.username,
+        u.email,
+        u.created_at,
+        r.name AS role
+      FROM users u
+      JOIN roles r ON u.role_id = r.id
+      ORDER BY u.created_at DESC
+      `
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Admin users error' });
+  }
+});
+
+app.delete('/api/admin/users/:id', async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const userId = Number(req.params.id);
+
+    if (admin.id === userId) {
+      return res.status(400).json({
+        message: 'You cannot delete your own admin account'
+      });
+    }
+
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await pool.query(
+      'DELETE FROM users WHERE id = $1',
+      [userId]
+    );
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete user error' });
+  }
+});
+
+app.get('/api/admin/recipes', async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        rv.id,
+        rv.name,
+        rv.description,
+        rv.image_url,
+        rv.created_at,
+        c.name AS cocktail_name,
+        u.username AS created_by,
+        u.email AS user_email
+      FROM recipe_versions rv
+      LEFT JOIN cocktails c ON rv.cocktail_id = c.id
+      LEFT JOIN users u ON rv.user_id = u.id
+      ORDER BY rv.created_at DESC
+      `
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Admin recipes error' });
+  }
+});
+
+// =======================
+// ADMIN COCKTAIL ROUTES
+// =======================
+
+app.post('/api/admin/cocktails', uploadCocktailImage.single('image'), async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const { name, difficulty_id, alcohol_type_id } = req.body;
+
+    if (!name || !difficulty_id || !alcohol_type_id) {
+      return res.status(400).json({
+        message: 'Name, difficulty and alcohol type are required'
+      });
+    }
+
+    const imageUrl = req.file ? `/uploads/cocktails/${req.file.filename}` : null;
+
+    const result = await pool.query(
+      `
+      INSERT INTO cocktails (name, image_url, difficulty_id, alcohol_type_id)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+      `,
+      [name, imageUrl, difficulty_id, alcohol_type_id]
+    );
+
+    res.status(201).json({
+      message: 'Cocktail created successfully',
+      cocktail: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Create cocktail error' });
+  }
+});
+
+app.put('/api/admin/cocktails/:id', uploadCocktailImage.single('image'), async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const cocktailId = req.params.id;
+    const { name, difficulty_id, alcohol_type_id } = req.body;
+
+    const cocktailResult = await pool.query(
+      'SELECT * FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    if (cocktailResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Cocktail not found' });
+    }
+
+    const oldCocktail = cocktailResult.rows[0];
+
+    const imageUrl = req.file
+      ? `/uploads/cocktails/${req.file.filename}`
+      : oldCocktail.image_url;
+
+    const result = await pool.query(
+      `
+      UPDATE cocktails
+      SET name = $1,
+          image_url = $2,
+          difficulty_id = $3,
+          alcohol_type_id = $4
+      WHERE id = $5
+      RETURNING *
+      `,
+      [
+        name || oldCocktail.name,
+        imageUrl,
+        difficulty_id || oldCocktail.difficulty_id,
+        alcohol_type_id || oldCocktail.alcohol_type_id,
+        cocktailId
+      ]
+    );
+
+    res.json({
+      message: 'Cocktail updated successfully',
+      cocktail: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Update cocktail error' });
+  }
+});
+
+app.delete('/api/admin/cocktails/:id', async (req, res) => {
+  try {
+    const admin = await getAdminUser(req, res);
+
+    if (!admin) {
+      return;
+    }
+
+    const cocktailId = req.params.id;
+
+    const cocktailResult = await pool.query(
+      'SELECT * FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    if (cocktailResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Cocktail not found' });
+    }
+
+    await pool.query(
+      'DELETE FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    res.json({ message: 'Cocktail deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete cocktail error' });
+  }
+});
+
+// =======================
+// LOOKUP ROUTES
+// =======================
+
+app.get('/api/lookups/difficulties', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM difficulties ORDER BY id ASC'
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Difficulties error' });
+  }
+});
+
+app.get('/api/lookups/alcohol-types', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM alcohol_types ORDER BY id ASC'
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Alcohol types error' });
+  }
+});
+
+app.get('/api/lookups/ingredients', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM ingredients ORDER BY name ASC'
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Ingredients error' });
   }
 });
 
