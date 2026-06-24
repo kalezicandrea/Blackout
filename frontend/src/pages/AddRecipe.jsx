@@ -1,17 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createRecipe, getCocktails, getSavedUser } from '../services/api';
+import {
+  createRecipe,
+  getAlcoholTypes,
+  getCocktails,
+  getDifficulties,
+  getSavedUser
+} from '../services/api';
+
+function formatOptionLabel(text) {
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-');
+}
 
 function AddRecipe() {
   const navigate = useNavigate();
   const user = getSavedUser();
 
   const [cocktails, setCocktails] = useState([]);
+  const [difficulties, setDifficulties] = useState([]);
+  const [alcoholTypes, setAlcoholTypes] = useState([]);
 
   const [formData, setFormData] = useState({
     cocktail_id: '',
     name: '',
     description: '',
+    difficulty_id: '',
+    alcohol_type_id: '',
     ingredientsText: '',
     stepsText: ''
   });
@@ -20,16 +41,21 @@ function AddRecipe() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    async function loadCocktails() {
+    async function loadData() {
       try {
-        const data = await getCocktails();
-        setCocktails(data);
+        const cocktailsData = await getCocktails();
+        const difficultiesData = await getDifficulties();
+        const alcoholTypesData = await getAlcoholTypes();
+
+        setCocktails(cocktailsData);
+        setDifficulties(difficultiesData);
+        setAlcoholTypes(alcoholTypesData);
       } catch (err) {
         console.error(err);
       }
     }
 
-    loadCocktails();
+    loadData();
   }, []);
 
   function handleChange(event) {
@@ -73,6 +99,11 @@ function AddRecipe() {
     try {
       setError('');
 
+      if (!formData.cocktail_id && (!formData.difficulty_id || !formData.alcohol_type_id)) {
+        setError('Difficulty and alcohol type are required for a new cocktail.');
+        return;
+      }
+
       const ingredients = parseIngredients(formData.ingredientsText);
       const steps = parseSteps(formData.stepsText);
 
@@ -85,6 +116,9 @@ function AddRecipe() {
 
       if (formData.cocktail_id) {
         dataToSend.append('cocktail_id', formData.cocktail_id);
+      } else {
+        dataToSend.append('difficulty_id', formData.difficulty_id);
+        dataToSend.append('alcohol_type_id', formData.alcohol_type_id);
       }
 
       if (image) {
@@ -111,25 +145,67 @@ function AddRecipe() {
 
       <form onSubmit={handleSubmit}>
         <div>
-          <label>Connect to cocktail</label>
+          <label>Recipe type</label>
           <br />
           <select
             name="cocktail_id"
             value={formData.cocktail_id}
             onChange={handleChange}
           >
-            <option value="">My original recipe</option>
+            <option value="">Create a New Cocktail</option>
 
             {cocktails.map((cocktail) => (
               <option key={cocktail.id} value={cocktail.id}>
-                {cocktail.name}
+                Add recipe version for: {cocktail.name}
               </option>
             ))}
           </select>
         </div>
 
+        {!formData.cocktail_id && (
+          <>
+            <div>
+              <label>Difficulty for new cocktail</label>
+              <br />
+              <select
+                name="difficulty_id"
+                value={formData.difficulty_id}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Choose Difficulty</option>
+
+                {difficulties.map((difficulty) => (
+                  <option key={difficulty.id} value={difficulty.id}>
+                    {formatOptionLabel(difficulty.name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label>Alcohol type for new cocktail</label>
+              <br />
+              <select
+                name="alcohol_type_id"
+                value={formData.alcohol_type_id}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Choose Alcohol Type</option>
+
+                {alcoholTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {formatOptionLabel(type.name)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+
         <div>
-          <label>Recipe name</label>
+          <label>{formData.cocktail_id ? 'Recipe name' : 'New cocktail name'}</label>
           <br />
           <input
             type="text"
@@ -160,7 +236,7 @@ function AddRecipe() {
             value={formData.ingredientsText}
             onChange={handleChange}
             rows="6"
-            placeholder={'Add ingredients...'}
+            placeholder={'lime juice, 30, ml\nmint leaves, 6, pieces\nsugar, 2, tsp'}
           />
         </div>
 
@@ -174,7 +250,7 @@ function AddRecipe() {
             value={formData.stepsText}
             onChange={handleChange}
             rows="6"
-            placeholder={'Add steps...'}
+            placeholder={'Add lime juice and sugar.\nAdd mint leaves.\nShake and serve.'}
           />
         </div>
 
@@ -190,7 +266,7 @@ function AddRecipe() {
 
         <br />
 
-        <button type="submit">Save recipe</button>
+        <button type="submit">Save</button>
       </form>
     </div>
   );

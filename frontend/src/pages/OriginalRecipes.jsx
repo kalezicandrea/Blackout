@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getOriginalRecipes } from '../services/api';
 
 function OriginalRecipes() {
-  const [recipes, setRecipes] = useState([]);
+  const [cocktails, setCocktails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -11,10 +11,10 @@ function OriginalRecipes() {
     async function loadOriginalRecipes() {
       try {
         const data = await getOriginalRecipes();
-        setRecipes(data);
+        setCocktails(data);
       } catch (err) {
         console.error(err);
-        setError('Could not load original recipes');
+        setError('Could not load original cocktails');
       } finally {
         setLoading(false);
       }
@@ -24,7 +24,7 @@ function OriginalRecipes() {
   }, []);
 
   if (loading) {
-    return <p>Loading original recipes...</p>;
+    return <p>Loading original cocktails...</p>;
   }
 
   if (error) {
@@ -33,35 +33,36 @@ function OriginalRecipes() {
 
   return (
     <div>
-      <h1>Original user recipes</h1>
+      <h1>Original user cocktails</h1>
 
       <p>
-        These are original recipes created by users, not connected to an existing cocktail.
+        These are new cocktails created by users together with their first recipe.
       </p>
 
-      {recipes.length === 0 ? (
-        <p>No original user recipes found.</p>
+      {cocktails.length === 0 ? (
+        <p>No original user cocktails found.</p>
       ) : (
         <div className="cocktail-grid">
-          {recipes.map((recipe) => (
-            <div className="cocktail-card" key={recipe.id}>
-              {recipe.image_url && (
+          {cocktails.map((cocktail) => (
+            <div className="cocktail-card" key={cocktail.id}>
+              {cocktail.image_url && (
                 <img
-                  src={`http://localhost:5000${recipe.image_url}`}
-                  alt={recipe.name}
+                  src={`http://localhost:5000${cocktail.image_url}`}
+                  alt={cocktail.name}
                 />
               )}
 
-              <h3>{recipe.name}</h3>
+              <h3>{cocktail.name}</h3>
 
-              <p className="card-meta">
-                Created by: {recipe.created_by}
-              </p>
+              <p className="card-meta">Created by: {cocktail.created_by}</p>
+              <p className="card-meta">Difficulty: {cocktail.difficulty}</p>
+              <p className="card-meta">Type: {cocktail.alcohol_type}</p>
+              <p className="card-meta">Rating: {cocktail.avg_rating}</p>
 
-              {recipe.description && <p>{recipe.description}</p>}
+              {cocktail.description && <p>{cocktail.description}</p>}
 
-              <Link className="card-link" to={`/recipes/${recipe.id}`}>
-                View recipe
+              <Link className="card-link" to={`/cocktails/${cocktail.id}`}>
+                View cocktail
               </Link>
             </div>
           ))}

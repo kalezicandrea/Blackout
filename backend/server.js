@@ -797,25 +797,32 @@ app.get('/api/recipes/original', async (req, res) => {
     const result = await pool.query(
       `
       SELECT
-        rv.id,
-        rv.cocktail_id,
-        rv.user_id,
-        rv.name,
-        rv.description,
-        rv.image_url,
-        rv.created_at,
-        u.username AS created_by
-      FROM recipe_versions rv
-      JOIN users u ON rv.user_id = u.id
-      WHERE rv.cocktail_id IS NULL
-      ORDER BY rv.created_at DESC
+        c.id,
+        c.name,
+        c.image_url,
+        c.avg_rating,
+        c.review_count,
+        d.name AS difficulty,
+        a.name AS alcohol_type,
+        u.username AS created_by,
+        rv.id AS recipe_id,
+        rv.description
+      FROM cocktails c
+      JOIN difficulties d ON c.difficulty_id = d.id
+      JOIN alcohol_types a ON c.alcohol_type_id = a.id
+      JOIN users u ON c.created_by_user_id = u.id
+      LEFT JOIN recipe_versions rv
+        ON rv.cocktail_id = c.id
+        AND rv.user_id = c.created_by_user_id
+      WHERE c.created_by_user_id IS NOT NULL
+      ORDER BY c.created_at DESC
       `
     );
 
     res.json(result.rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Original user recipes error' });
+    res.status(500).json({ message: 'Original user cocktails error' });
   }
 });
 
@@ -887,6 +894,8 @@ app.get('/api/recipes/:id', async (req, res) => {
 });
 
 app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => {
+  const client = await pool.connect();
+
   try {
     const user = await getLoggedUser(req);
 
@@ -894,7 +903,13 @@ app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => 
       return res.status(401).json({ message: 'You must be logged in' });
     }
 
-    const { cocktail_id, name, description } = req.body;
+    const {
+      cocktail_id,
+      name,
+      description,
+      difficulty_id,
+      alcohol_type_id
+    } = req.body;
 
     const ingredients = parseJsonArray(req.body.ingredients);
     const steps = parseJsonArray(req.body.steps);
@@ -905,14 +920,51 @@ app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => 
 
     const imageUrl = req.file ? `/uploads/recipes/${req.file.filename}` : null;
 
-    const newRecipe = await pool.query(
+    await client.query('BEGIN');
+
+    let finalCocktailId = cocktail_id || null;
+
+    if (!finalCocktailId) {
+      if (!difficulty_id || !alcohol_type_id) {
+        await client.query('ROLLBACK');
+
+        return res.status(400).json({
+          message: 'Difficulty and alcohol type are required for a new cocktail'
+        });
+      }
+
+      const newCocktail = await client.query(
+        `
+        INSERT INTO cocktails (
+          name,
+          image_url,
+          difficulty_id,
+          alcohol_type_id,
+          created_by_user_id
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+        `,
+        [
+          name,
+          imageUrl,
+          difficulty_id,
+          alcohol_type_id,
+          user.id
+        ]
+      );
+
+      finalCocktailId = newCocktail.rows[0].id;
+    }
+
+    const newRecipe = await client.query(
       `
       INSERT INTO recipe_versions (cocktail_id, user_id, name, description, image_url)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
       `,
       [
-        cocktail_id || null,
+        finalCocktailId,
         user.id,
         name,
         description || null,
@@ -927,9 +979,31 @@ app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => 
         continue;
       }
 
-      const ingredientId = await getOrCreateIngredient(item.name);
+      const cleanName = item.name.trim().toLowerCase();
 
-      await pool.query(
+      let ingredientResult = await client.query(
+        'SELECT id FROM ingredients WHERE name = $1',
+        [cleanName]
+      );
+
+      let ingredientId;
+
+      if (ingredientResult.rows.length > 0) {
+        ingredientId = ingredientResult.rows[0].id;
+      } else {
+        ingredientResult = await client.query(
+          `
+          INSERT INTO ingredients (name)
+          VALUES ($1)
+          RETURNING id
+          `,
+          [cleanName]
+        );
+
+        ingredientId = ingredientResult.rows[0].id;
+      }
+
+      await client.query(
         `
         INSERT INTO recipe_ingredients (recipe_version_id, ingredient_id, quantity, unit)
         VALUES ($1, $2, $3, $4)
@@ -949,7 +1023,7 @@ app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => 
         continue;
       }
 
-      await pool.query(
+      await client.query(
         `
         INSERT INTO steps (recipe_version_id, step_number, text)
         VALUES ($1, $2, $3)
@@ -962,13 +1036,20 @@ app.post('/api/recipes', uploadRecipeImage.single('image'), async (req, res) => 
       );
     }
 
+    await client.query('COMMIT');
+
     res.status(201).json({
       message: 'Recipe created successfully',
-      recipe: newRecipe.rows[0]
+      recipe: newRecipe.rows[0],
+      cocktail_id: finalCocktailId
     });
   } catch (error) {
+    await client.query('ROLLBACK');
+
     console.error(error);
     res.status(500).json({ message: 'Create recipe error' });
+  } finally {
+    client.release();
   }
 });
 

@@ -31,7 +31,7 @@ function Navbar() {
         <div className="nav-links">
           <Link to="/">Home</Link>
           <Link to="/cocktails">Cocktails</Link>
-          <Link to="/original-recipes">Original recipes</Link>
+          <Link to="/original-recipes">Original cocktails</Link>
 
           <button
             type="button"

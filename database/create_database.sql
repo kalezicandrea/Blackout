@@ -48,7 +48,8 @@ CREATE TABLE cocktails (
   alcohol_type_id INT NOT NULL REFERENCES alcohol_types(id),
   avg_rating DECIMAL(3,2) DEFAULT 0,
   review_count INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_by_user_id INT REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE favorites (
