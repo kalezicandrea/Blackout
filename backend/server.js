@@ -323,7 +323,14 @@ app.get('/api/cocktails', async (req, res) => {
     if (sort === 'popular') {
       query += ` ORDER BY c.review_count DESC, c.avg_rating DESC`;
     } else if (sort === 'rating') {
-      query += ` ORDER BY c.avg_rating DESC`;
+      query += ` ORDER BY c.avg_rating DESC, c.review_count DESC`;
+    } else if (sort === 'rating_low') {
+      query += `
+        ORDER BY 
+          CASE WHEN c.review_count = 0 THEN 1 ELSE 0 END,
+          c.avg_rating ASC,
+          c.review_count DESC
+      `;
     } else {
       query += ` ORDER BY c.name ASC`;
     }

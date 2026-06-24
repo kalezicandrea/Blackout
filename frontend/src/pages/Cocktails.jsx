@@ -9,6 +9,17 @@ import {
   getCocktailsByIngredients
 } from '../services/api';
 
+function formatOptionLabel(text) {
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-');
+}
+
 function Cocktails() {
   const navigate = useNavigate();
 
@@ -140,7 +151,7 @@ function Cocktails() {
             name="search"
             value={filters.search}
             onChange={handleChange}
-            placeholder="mojito"
+            placeholder="Mojito"
           />
         </div>
 
@@ -152,11 +163,11 @@ function Cocktails() {
             value={filters.difficulty}
             onChange={handleChange}
           >
-            <option value="">All difficulties</option>
+            <option value="">All Difficulties</option>
 
             {difficulties.map((difficulty) => (
               <option key={difficulty.id} value={difficulty.name}>
-                {difficulty.name}
+                {formatOptionLabel(difficulty.name)}
               </option>
             ))}
           </select>
@@ -170,41 +181,29 @@ function Cocktails() {
             value={filters.alcohol_type}
             onChange={handleChange}
           >
-            <option value="">All types</option>
+            <option value="">All Types</option>
 
             {alcoholTypes.map((type) => (
               <option key={type.id} value={type.name}>
-                {type.name}
+                {formatOptionLabel(type.name)}
               </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label>Ingredient</label>
-          <br />
-          <input
-            type="text"
-            name="ingredient"
-            value={filters.ingredient}
-            onChange={handleChange}
-            placeholder="lime juice"
-          />
-        </div>
-
-        <div>
-          <label>Minimum rating</label>
+          <label>Minimum Rating</label>
           <br />
           <select
             name="min_rating"
             value={filters.min_rating}
             onChange={handleChange}
           >
-            <option value="">Any rating</option>
-            <option value="1">1+</option>
-            <option value="2">2+</option>
-            <option value="3">3+</option>
-            <option value="4">4+</option>
+            <option value="">Any Rating</option>
+            <option value="1">&gt;1</option>
+            <option value="2">&gt;2</option>
+            <option value="3">&gt;3</option>
+            <option value="4">&gt;4</option>
             <option value="5">5</option>
           </select>
         </div>
@@ -216,11 +215,12 @@ function Cocktails() {
             name="sort"
             value={filters.sort}
             onChange={handleChange}
-          >
+            >
             <option value="">Name A-Z</option>
             <option value="popular">Most popular</option>
-            <option value="rating">Best rated</option>
-          </select>
+            <option value="rating">Rating: High to Low</option>
+            <option value="rating_low">Rating: Low to High</option>
+            </select>
         </div>
 
         <br />

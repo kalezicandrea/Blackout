@@ -160,7 +160,7 @@ function AddRecipe() {
             value={formData.ingredientsText}
             onChange={handleChange}
             rows="6"
-            placeholder={'lime juice, 30, ml\nmint leaves, 6, pieces\nsugar, 2, tsp'}
+            placeholder={'Add ingredients...'}
           />
         </div>
 
@@ -174,7 +174,7 @@ function AddRecipe() {
             value={formData.stepsText}
             onChange={handleChange}
             rows="6"
-            placeholder={'Add lime juice and sugar.\nAdd mint leaves.\nShake and serve.'}
+            placeholder={'Add steps...'}
           />
         </div>
 
