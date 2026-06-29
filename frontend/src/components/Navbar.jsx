@@ -19,19 +19,26 @@ function Navbar() {
     }
   }
 
+  function scrollToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+
   return (
     <nav className="navbar">
       <div className="navbar-inner">
         <h2 className="brand">
-          <Link to="/">
+          <Link to="/" onClick={scrollToTop}>
             Black<span>out</span>
           </Link>
         </h2>
 
         <div className="nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/cocktails">Cocktails</Link>
-          <Link to="/original-recipes">Original cocktails</Link>
+          <Link to="/" onClick={scrollToTop}>Home</Link>
+          <Link to="/cocktails" onClick={scrollToTop}>Cocktails</Link>
+          <Link to="/original-recipes" onClick={scrollToTop}>Original cocktails</Link>
 
           <button
             type="button"
@@ -43,12 +50,12 @@ function Navbar() {
 
           {user ? (
             <>
-              <Link to="/favorites">Favorites</Link>
-              <Link to="/my-recipes">My recipes</Link>
-              <Link to="/add-recipe">Add recipe</Link>
+              <Link to="/favorites" onClick={scrollToTop}>Favorites</Link>
+              <Link to="/my-recipes" onClick={scrollToTop}>My recipes</Link>
+              <Link to="/add-recipe" onClick={scrollToTop}>Add recipe</Link>
 
               {user.role === 'admin' && (
-                <Link to="/admin">Admin panel</Link>
+                <Link to="/admin" onClick={scrollToTop}>Admin panel</Link>
               )}
 
               <span className="logged-user">

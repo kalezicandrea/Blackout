@@ -2,6 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getOriginalRecipes } from '../services/api';
 
+function formatOptionLabel(text) {
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-');
+}
+
 function OriginalRecipes() {
   const [cocktails, setCocktails] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,21 +56,51 @@ function OriginalRecipes() {
         <div className="cocktail-grid">
           {cocktails.map((cocktail) => (
             <div className="cocktail-card" key={cocktail.id}>
-              {cocktail.image_url && (
-                <img
-                  src={`http://localhost:5000${cocktail.image_url}`}
-                  alt={cocktail.name}
-                />
-              )}
+              <div className="ticket-title">
+                {cocktail.name}
+              </div>
 
-              <h3>{cocktail.name}</h3>
+              <div className="ticket-dashed-line"></div>
 
-              <p className="card-meta">Created by: {cocktail.created_by}</p>
-              <p className="card-meta">Difficulty: {cocktail.difficulty}</p>
-              <p className="card-meta">Type: {cocktail.alcohol_type}</p>
-              <p className="card-meta">Rating: {cocktail.avg_rating}</p>
+              <div className="ticket-image">
+                {cocktail.image_url && (
+                  <img
+                    src={`http://localhost:5000${cocktail.image_url}`}
+                    alt={cocktail.name}
+                  />
+                )}
+              </div>
 
-              {cocktail.description && <p>{cocktail.description}</p>}
+              <div className="ticket-details">
+                <p>
+                  <span>Created by</span>
+                  <strong>{cocktail.created_by}</strong>
+                </p>
+
+                <p>
+                  <span>Difficulty</span>
+                  <strong>{formatOptionLabel(cocktail.difficulty)}</strong>
+                </p>
+
+                <p>
+                  <span>Type</span>
+                  <strong>{formatOptionLabel(cocktail.alcohol_type)}</strong>
+                </p>
+              </div>
+
+              <div className="ticket-dashed-line"></div>
+
+              <div className="ticket-stats">
+                <div>
+                  <span>Rating</span>
+                  <strong>★ {cocktail.avg_rating}</strong>
+                </div>
+
+                <div>
+                  <span>Reviews</span>
+                  <strong>{cocktail.review_count || 0}</strong>
+                </div>
+              </div>
 
               <Link className="card-link" to={`/cocktails/${cocktail.id}`}>
                 View cocktail

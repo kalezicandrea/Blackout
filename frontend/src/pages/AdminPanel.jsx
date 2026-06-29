@@ -14,6 +14,17 @@ import {
   deleteAdminCocktail
 } from '../services/api';
 
+function formatOptionLabel(text) {
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-');
+}
+
 function AdminPanel() {
   const user = getSavedUser();
   const cocktailFormRef = useRef(null);
@@ -310,35 +321,63 @@ function AdminPanel() {
         <div className="cocktail-grid">
           {cocktails.map((cocktail) => (
             <div className="cocktail-card" key={cocktail.id}>
-              {cocktail.image_url && (
-                <img
-                  src={`http://localhost:5000${cocktail.image_url}`}
-                  alt={cocktail.name}
-                />
-              )}
+              <div className="ticket-title">
+                {cocktail.name}
+              </div>
 
-              <h3>{cocktail.name}</h3>
+              <div className="ticket-dashed-line"></div>
 
-              <p className="card-meta">Difficulty: {cocktail.difficulty}</p>
-              <p className="card-meta">Type: {cocktail.alcohol_type}</p>
-              <p className="card-meta">Rating: {cocktail.avg_rating}</p>
-              <p className="card-meta">Reviews: {cocktail.review_count}</p>
+              <div className="ticket-image">
+                {cocktail.image_url && (
+                  <img
+                    src={`http://localhost:5000${cocktail.image_url}`}
+                    alt={cocktail.name}
+                  />
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleEditCocktail(cocktail)}
-              >
-                Edit
-              </button>
+              <div className="ticket-details">
+                <p>
+                  <span>Difficulty</span>
+                  <strong>{formatOptionLabel(cocktail.difficulty)}</strong>
+                </p>
 
-              {' '}
+                <p>
+                  <span>Type</span>
+                  <strong>{formatOptionLabel(cocktail.alcohol_type)}</strong>
+                </p>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleDeleteCocktail(cocktail.id)}
-              >
-                Delete
-              </button>
+              <div className="ticket-dashed-line"></div>
+
+              <div className="ticket-stats">
+                <div>
+                  <span>Rating</span>
+                  <strong>★ {cocktail.avg_rating}</strong>
+                </div>
+
+                <div>
+                  <span>Reviews</span>
+                  <strong>{cocktail.review_count}</strong>
+                </div>
+              </div>
+
+              <div className="ticket-admin-actions">
+                <button
+                  type="button"
+                  onClick={() => handleEditCocktail(cocktail)}
+                >
+                  Edit
+                </button>
+
+                <button
+                  className='admin-delete-button'
+                  type="button"
+                  onClick={() => handleDeleteCocktail(cocktail.id)}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -359,6 +398,7 @@ function AdminPanel() {
             <p>Role: {item.role}</p>
 
             <button
+              className='delete-button'
               type="button"
               onClick={() => handleDeleteUser(item.id)}
             >
@@ -376,44 +416,50 @@ function AdminPanel() {
         <p>No recipes found.</p>
       ) : (
         recipes.map((recipe) => (
-          <div className="feature-card" key={recipe.id}>
-            <h3>{recipe.name}</h3>
+          <div className="feature-card image-right-card" key={recipe.id}>
+            <div className="image-right-text">
+              <h3>{recipe.name}</h3>
+
+              {recipe.cocktail_name && (
+                <p>Cocktail: {recipe.cocktail_name}</p>
+              )}
+
+              {recipe.created_by ? (
+                <p>Created by: {recipe.created_by}</p>
+              ) : (
+                <p>Created by: Blackout</p>
+              )}
+
+              {recipe.user_email && (
+                <p>User email: {recipe.user_email}</p>
+              )}
+
+              {recipe.description && <p>{recipe.description}</p>}
+
+              <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
+
+              {' | '}
+
+              <button
+                className='delete-button'
+                type="button"
+                onClick={() => handleDeleteRecipe(recipe.id)}
+              >
+                Delete recipe
+              </button>
+            </div>
 
             {recipe.image_url && (
-              <img
-                src={`http://localhost:5000${recipe.image_url}`}
-                alt={recipe.name}
-                width="200"
-              />
+              <div className="image-right-img">
+                <img
+                  src={`http://localhost:5000${recipe.image_url}`}
+                  alt={recipe.name}
+                />
+              </div>
             )}
-
-            {recipe.cocktail_name && (
-              <p>Cocktail: {recipe.cocktail_name}</p>
-            )}
-
-            {recipe.created_by ? (
-              <p>Created by: {recipe.created_by}</p>
-            ) : (
-              <p>Created by: Original recipe</p>
-            )}
-
-            {recipe.user_email && (
-              <p>User email: {recipe.user_email}</p>
-            )}
-
-            {recipe.description && <p>{recipe.description}</p>}
-
-            <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
-
-            {' | '}
-
-            <button
-              type="button"
-              onClick={() => handleDeleteRecipe(recipe.id)}
-            >
-              Delete recipe
-            </button>
           </div>
+          
+
         ))
       )}
     </div>

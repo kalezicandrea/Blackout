@@ -207,6 +207,75 @@ export async function saveReview(cocktailId, reviewData) {
   return data;
 }
 
+export async function deleteReview(reviewId) {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/reviews/${reviewId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete review');
+  }
+
+  return data;
+}
+
+export async function getRecipeComments(recipeId) {
+  const response = await fetch(`${API_URL}/recipe-comments/${recipeId}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch recipe comments');
+  }
+
+  return response.json();
+}
+
+export async function saveRecipeComment(recipeId, commentData) {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/recipe-comments/${recipeId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(commentData)
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to save recipe comment');
+  }
+
+  return data;
+}
+
+export async function deleteRecipeComment(commentId) {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/recipe-comments/${commentId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete recipe comment');
+  }
+
+  return data;
+}
+
 export async function getMyRecipes() {
   const token = getToken();
 

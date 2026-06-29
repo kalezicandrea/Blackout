@@ -42,7 +42,23 @@ function App() {
         </main>
 
         <footer className="footer">
-          <p>Blackout · Cocktail recipe app</p>
+          <div className="footer-content">
+            <p className="footer-title">Contact us:</p>
+
+            <div className="footer-icons">
+              <a href="https://www.instagram.com/" target="_blank" rel="noreferrer">
+                <img src="/icons/instagram.png" alt="Instagram" />
+              </a>
+
+              <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">
+                <img src="/icons/facebook.png" alt="Facebook" />
+              </a>
+
+              <a href="mailto:blackout@test.com">
+                <img src="/icons/email.png" alt="E-mail" />
+              </a>
+            </div>
+          </div>
         </footer>
       </div>
     </BrowserRouter>

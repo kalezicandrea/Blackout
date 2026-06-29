@@ -7,8 +7,20 @@ import {
   removeFavorite,
   getFavorites,
   getSavedUser,
-  saveReview
+  saveReview,
+  deleteReview
 } from '../services/api';
+
+function formatOptionLabel(text) {
+  if (!text) {
+    return '';
+  }
+
+  return text
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-');
+}
 
 function CocktailDetails() {
   const { id } = useParams();
@@ -26,8 +38,6 @@ function CocktailDetails() {
 
   const [reviewForm, setReviewForm] = useState({
     rate: '',
-    sweet_rate: '',
-    bitter_rate: '',
     text: ''
   });
 
@@ -106,8 +116,6 @@ async function handleReviewSubmit(event) {
 
     await saveReview(id, {
       rate: Number(reviewForm.rate),
-      sweet_rate: reviewForm.sweet_rate ? Number(reviewForm.sweet_rate) : null,
-      bitter_rate: reviewForm.bitter_rate ? Number(reviewForm.bitter_rate) : null,
       text: reviewForm.text
     });
 
@@ -121,10 +129,32 @@ async function handleReviewSubmit(event) {
 
     setReviewForm({
       rate: '',
-      sweet_rate: '',
-      bitter_rate: '',
       text: ''
     });
+  } catch (err) {
+    setReviewMessage(err.message);
+  }
+}
+
+async function handleDeleteReview(reviewId) {
+  const confirmed = window.confirm('Are you sure you want to delete this review?');
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    setReviewMessage('');
+
+    await deleteReview(reviewId);
+
+    const updatedReviews = await getCocktailReviews(id);
+    const updatedDetails = await getCocktailDetails(id);
+
+    setReviews(updatedReviews);
+    setCocktail(updatedDetails.cocktail);
+
+    setReviewMessage('Review deleted successfully.');
   } catch (err) {
     setReviewMessage(err.message);
   }
@@ -146,35 +176,41 @@ return (
     <div>
         <Link to="/cocktails">Back to cocktails</Link>
 
-        <h1>{cocktail.name}</h1>
+        <div className="cocktail-detail-highlight image-right-card">
+        <div className="image-right-text">
+            <h1>{cocktail.name}</h1>
+
+            <p>Difficulty: {formatOptionLabel(cocktail.difficulty)}</p>
+            <p>Type: {formatOptionLabel(cocktail.alcohol_type)}</p>
+            <p>Average rating: {cocktail.avg_rating}</p>
+            <p>Number of reviews: {cocktail.review_count}</p>
+
+            {user && (
+            <>
+                {isFavorite ? (
+                <button type="button" onClick={handleRemoveFavorite}>
+                    Remove from favorites
+                </button>
+                ) : (
+                <button type="button" onClick={handleAddFavorite}>
+                    Add to favorites
+                </button>
+                )}
+            </>
+            )}
+
+            {favoriteMessage && <p>{favoriteMessage}</p>}
+        </div>
 
         {cocktail.image_url && (
-        <img
-            src={`http://localhost:5000${cocktail.image_url}`}
-            alt={cocktail.name}
-            width="250"
-        />
+            <div className="image-right-img">
+            <img
+                src={`http://localhost:5000${cocktail.image_url}`}
+                alt={cocktail.name}
+            />
+            </div>
         )}
-
-        <p>Difficulty: {cocktail.difficulty}</p>
-        <p>Type: {cocktail.alcohol_type}</p>
-        <p>Average rating: {cocktail.avg_rating}</p>
-        <p>Number of reviews: {cocktail.review_count}</p>
-       {user && (
-        <>
-            {isFavorite ? (
-            <button type="button" onClick={handleRemoveFavorite}>
-                Remove from favorites
-            </button>
-            ) : (
-            <button type="button" onClick={handleAddFavorite}>
-                Add to favorites
-            </button>
-            )}
-        </>
-        )}
-
-        {favoriteMessage && <p>{favoriteMessage}</p>}
+        </div>
 
         <hr />
 
@@ -184,29 +220,30 @@ return (
         <p>No recipes found for this cocktail.</p>
         ) : (
         recipes.map((recipe) => (
-            <div key={recipe.id}>
-            <h3>{recipe.name}</h3>
+            <div className="feature-card image-right-card" key={recipe.id}>
+                <div className="image-right-text">
+                <h3>{recipe.name}</h3>
 
-            {recipe.image_url && (
-                <img
-                src={`http://localhost:5000${recipe.image_url}`}
-                alt={recipe.name}
-                width="200"
-                />
-            )}
+                <p>{recipe.description}</p>
 
-            <p>{recipe.description}</p>
+                <p>
+                    Created by:{' '}
+                    {recipe.created_by ? recipe.created_by : 'Blackout'}
+                </p>
 
-            <p>
-                Created by:{' '}
-                {recipe.created_by ? recipe.created_by : 'Original recipe'}
-            </p>
+                <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
+                </div>
 
-            <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
-
-            <hr />
+                {recipe.image_url && (
+                <div className="image-right-img">
+                    <img
+                    src={`http://localhost:5000${recipe.image_url}`}
+                    alt={recipe.name}
+                    />
+                </div>
+                )}
             </div>
-        ))
+            ))
         )}
 
         <h2>Reviews</h2>
@@ -224,40 +261,6 @@ return (
                 required
             >
                 <option value="">Choose rating</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-            </div>
-
-            <div>
-            <label>Sweetness</label>
-            <br />
-            <select
-                name="sweet_rate"
-                value={reviewForm.sweet_rate}
-                onChange={handleReviewChange}
-            >
-                <option value="">Choose sweetness</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-            </select>
-            </div>
-
-            <div>
-            <label>Bitterness</label>
-            <br />
-            <select
-                name="bitter_rate"
-                value={reviewForm.bitter_rate}
-                onChange={handleReviewChange}
-            >
-                <option value="">Choose bitterness</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
@@ -292,26 +295,31 @@ return (
         <p>No reviews yet.</p>
         ) : (
         reviews.map((review) => (
-            <div key={review.id}>
-            <p>
+            <div className="review-card" key={review.id}>
+                <div className="review-card-header">
                 <strong>{review.username}</strong>
-            </p>
+                <span>★ {review.rate}/5</span>
+                </div>
 
-            <p>Rating: {review.rate}/5</p>
+                {review.text && (
+                <p className="review-text">
+                    {review.text}
+                </p>
+                )}
 
-            {review.sweet_rate && (
-                <p>Sweetness: {review.sweet_rate}/5</p>
-            )}
-
-            {review.bitter_rate && (
-                <p>Bitterness: {review.bitter_rate}/5</p>
-            )}
-
-            {review.text && <p>{review.text}</p>}
-
-            <hr />
+                {user && (
+                user.role === 'admin' || Number(user.id) === Number(review.user_id)
+                ) && (
+                <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => handleDeleteReview(review.id)}
+                >
+                    Delete review
+                </button>
+                )}
             </div>
-        ))
+            ))
         )}
     </div>
     );

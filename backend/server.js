@@ -276,7 +276,7 @@ app.get('/api/cocktails', async (req, res) => {
     } = req.query;
 
     let query = `
-      SELECT DISTINCT
+      SELECT
         c.id,
         c.name,
         c.image_url,
@@ -320,16 +320,38 @@ app.get('/api/cocktails', async (req, res) => {
       query += ` AND c.avg_rating >= $${values.length}`;
     }
 
+    query += `
+      GROUP BY
+        c.id,
+        c.name,
+        c.image_url,
+        c.avg_rating,
+        c.review_count,
+        d.name,
+        a.name
+    `;
+
     if (sort === 'popular') {
-      query += ` ORDER BY c.review_count DESC, c.avg_rating DESC`;
+      query += `
+        ORDER BY
+          COALESCE(c.review_count, 0) DESC,
+          COALESCE(c.avg_rating, 0) DESC,
+          c.name ASC
+      `;
     } else if (sort === 'rating') {
-      query += ` ORDER BY c.avg_rating DESC, c.review_count DESC`;
+      query += `
+        ORDER BY
+          CASE WHEN COALESCE(c.review_count, 0) = 0 THEN 1 ELSE 0 END ASC,
+          COALESCE(c.avg_rating, 0) DESC,
+          COALESCE(c.review_count, 0) DESC,
+          c.name ASC
+      `;
     } else if (sort === 'rating_low') {
       query += `
-        ORDER BY 
-          CASE WHEN c.review_count = 0 THEN 1 ELSE 0 END,
-          c.avg_rating ASC,
-          c.review_count DESC
+        ORDER BY
+          COALESCE(c.avg_rating, 0) ASC,
+          COALESCE(c.review_count, 0) ASC,
+          c.name ASC
       `;
     } else {
       query += ` ORDER BY c.name ASC`;
@@ -343,6 +365,90 @@ app.get('/api/cocktails', async (req, res) => {
     res.status(500).json({ message: 'Cocktail search/filter error' });
   }
 });
+
+// app.get('/api/cocktails', async (req, res) => {
+//   try {
+//     const {
+//       search,
+//       difficulty,
+//       alcohol_type,
+//       ingredient,
+//       min_rating,
+//       sort
+//     } = req.query;
+
+//     console.log('SORT:', sort);
+
+//     let query = `
+//       SELECT DISTINCT
+//         c.id,
+//         c.name,
+//         c.image_url,
+//         c.avg_rating,
+//         c.review_count,
+//         CASE WHEN c.review_count = 0 THEN 1 ELSE 0 END AS no_reviews_sort,
+//         d.name AS difficulty,
+//         a.name AS alcohol_type
+//       FROM cocktails c
+//       JOIN difficulties d ON c.difficulty_id = d.id
+//       JOIN alcohol_types a ON c.alcohol_type_id = a.id
+//       LEFT JOIN recipe_versions rv ON rv.cocktail_id = c.id
+//       LEFT JOIN recipe_ingredients ri ON ri.recipe_version_id = rv.id
+//       LEFT JOIN ingredients i ON i.id = ri.ingredient_id
+//       WHERE 1 = 1
+//     `;
+
+//     const values = [];
+
+//     if (search) {
+//       values.push(`%${search}%`);
+//       query += ` AND c.name ILIKE $${values.length}`;
+//     }
+
+//     if (difficulty) {
+//       values.push(difficulty);
+//       query += ` AND d.name = $${values.length}`;
+//     }
+
+//     if (alcohol_type) {
+//       values.push(alcohol_type);
+//       query += ` AND a.name = $${values.length}`;
+//     }
+
+//     if (ingredient) {
+//       values.push(`%${ingredient}%`);
+//       query += ` AND i.name ILIKE $${values.length}`;
+//     }
+
+//     if (min_rating) {
+//       values.push(min_rating);
+//       query += ` AND c.avg_rating >= $${values.length}`;
+//     }
+
+//     if (sort === 'popular') {
+//       query += ` ORDER BY c.review_count DESC, c.avg_rating DESC`;
+//     } else if (sort === 'rating') {
+//       query += ` ORDER BY c.avg_rating DESC, c.review_count DESC`;
+//     } else if (sort === 'rating_low') {
+//        query += `
+//           ORDER BY
+//             CASE WHEN COALESCE(c.review_count, 0) = 0 THEN 1 ELSE 0 END ASC,
+//             COALESCE(NULLIF(c.avg_rating::text, '')::numeric, 0) ASC,
+//             COALESCE(c.review_count, 0) DESC,
+//             c.name ASC
+//         `;
+//     } else {
+//       query += ` ORDER BY c.name ASC`;
+//     }
+
+//     const result = await pool.query(query, values);
+
+//     res.json(result.rows);
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: 'Cocktail search/filter error' });
+//   }
+// });
 
 app.get('/api/cocktails/random', async (req, res) => {
   try {
@@ -623,10 +729,9 @@ app.get('/api/reviews/:cocktailId', async (req, res) => {
       `
       SELECT 
         r.id,
+        r.user_id,
         r.text,
         r.rate,
-        r.sweet_rate,
-        r.bitter_rate,
         r.created_at,
         u.username
       FROM reviews r
@@ -653,23 +758,11 @@ app.post('/api/reviews/:cocktailId', async (req, res) => {
     }
 
     const cocktailId = req.params.cocktailId;
-    const { text, rate, sweet_rate, bitter_rate } = req.body;
+    const { text, rate } = req.body;
 
     if (!rate || rate < 1 || rate > 5) {
       return res.status(400).json({
         message: 'Rate must be between 1 and 5'
-      });
-    }
-
-    if (sweet_rate && (sweet_rate < 1 || sweet_rate > 5)) {
-      return res.status(400).json({
-        message: 'Sweet rate must be between 1 and 5'
-      });
-    }
-
-    if (bitter_rate && (bitter_rate < 1 || bitter_rate > 5)) {
-      return res.status(400).json({
-        message: 'Bitter rate must be between 1 and 5'
       });
     }
 
@@ -684,18 +777,16 @@ app.post('/api/reviews/:cocktailId', async (req, res) => {
 
     const reviewResult = await pool.query(
       `
-      INSERT INTO reviews (text, rate, sweet_rate, bitter_rate, user_id, cocktail_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO reviews (text, rate, user_id, cocktail_id)
+      VALUES ($1, $2, $3, $4)
       ON CONFLICT (user_id, cocktail_id)
       DO UPDATE SET
         text = EXCLUDED.text,
         rate = EXCLUDED.rate,
-        sweet_rate = EXCLUDED.sweet_rate,
-        bitter_rate = EXCLUDED.bitter_rate,
         created_at = CURRENT_TIMESTAMP
       RETURNING *
       `,
-      [text, rate, sweet_rate, bitter_rate, user.id, cocktailId]
+      [text, rate, user.id, cocktailId]
     );
 
     await updateCocktailRating(cocktailId);
@@ -707,6 +798,57 @@ app.post('/api/reviews/:cocktailId', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Save review error' });
+  }
+});
+
+app.delete('/api/reviews/:reviewId', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const reviewId = req.params.reviewId;
+
+    const reviewResult = await pool.query(
+      `
+      SELECT id, user_id, cocktail_id
+      FROM reviews
+      WHERE id = $1
+      `,
+      [reviewId]
+    );
+
+    if (reviewResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Review not found' });
+    }
+
+    const review = reviewResult.rows[0];
+
+    const isAdmin = user.role === 'admin';
+    const isOwner = Number(review.user_id) === Number(user.id);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        message: 'You can delete only your own review'
+      });
+    }
+
+    await pool.query(
+      `
+      DELETE FROM reviews
+      WHERE id = $1
+      `,
+      [reviewId]
+    );
+
+    await updateCocktailRating(review.cocktail_id);
+
+    res.json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete review error' });
   }
 });
 
@@ -1203,6 +1345,124 @@ app.delete('/api/recipes/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Delete recipe error' });
+  }
+});
+
+app.get('/api/recipe-comments/:recipeId', async (req, res) => {
+  try {
+    const recipeId = req.params.recipeId;
+
+    const result = await pool.query(
+      `
+      SELECT
+        rc.id,
+        rc.text,
+        rc.user_id,
+        rc.created_at,
+        u.username
+      FROM recipe_comments rc
+      JOIN users u ON rc.user_id = u.id
+      WHERE rc.recipe_version_id = $1
+      ORDER BY rc.created_at DESC
+      `,
+      [recipeId]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Recipe comments fetch error' });
+  }
+});
+
+app.post('/api/recipe-comments/:recipeId', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const recipeId = req.params.recipeId;
+    const { text } = req.body;
+
+    if (!text || text.trim() === '') {
+      return res.status(400).json({
+        message: 'Comment cannot be empty'
+      });
+    }
+
+    const recipeResult = await pool.query(
+      'SELECT id FROM recipe_versions WHERE id = $1',
+      [recipeId]
+    );
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Recipe not found' });
+    }
+
+    const commentResult = await pool.query(
+      `
+      INSERT INTO recipe_comments (text, user_id, recipe_version_id)
+      VALUES ($1, $2, $3)
+      RETURNING *
+      `,
+      [text, user.id, recipeId]
+    );
+
+    res.json({
+      message: 'Comment saved successfully',
+      comment: commentResult.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Save recipe comment error' });
+  }
+});
+
+app.delete('/api/recipe-comments/:commentId', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const commentId = req.params.commentId;
+
+    const commentResult = await pool.query(
+      `
+      SELECT id, user_id
+      FROM recipe_comments
+      WHERE id = $1
+      `,
+      [commentId]
+    );
+
+    if (commentResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    const comment = commentResult.rows[0];
+
+    const isAdmin = user.role === 'admin';
+    const isOwner = Number(comment.user_id) === Number(user.id);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        message: 'You can delete only your own comment'
+      });
+    }
+
+    await pool.query(
+      'DELETE FROM recipe_comments WHERE id = $1',
+      [commentId]
+    );
+
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete recipe comment error' });
   }
 });
 

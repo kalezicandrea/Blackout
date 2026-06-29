@@ -7,19 +7,19 @@ function Home() {
   const user = getSavedUser();
   const navigate = useNavigate();
 
-  const [topCocktails, setTopCocktails] = useState([]);
+  const [cocktails, setCocktails] = useState([]);
 
   useEffect(() => {
-    async function loadTopCocktails() {
+    async function loadCocktails() {
       try {
         const data = await getCocktails({ sort: 'rating' });
-        setTopCocktails(data.slice(0, 4));
+        setCocktails(data);
       } catch (error) {
         console.error(error);
       }
     }
 
-    loadTopCocktails();
+    loadCocktails();
   }, []);
 
   async function handleRandomCocktail() {
@@ -31,10 +31,23 @@ function Home() {
     }
   }
 
+  const bestCocktail = cocktails.length > 0
+    ? [...cocktails].sort((a, b) => {
+        const scoreA = Number(a.avg_rating || 0) * Number(a.review_count || 0);
+        const scoreB = Number(b.avg_rating || 0) * Number(b.review_count || 0);
+
+        return scoreB - scoreA;
+      })[0]
+    : null;
+
+  const topRatedCocktails = [...cocktails]
+    .filter((cocktail) => cocktail.id !== bestCocktail?.id)
+    .sort((a, b) => Number(b.avg_rating || 0) - Number(a.avg_rating || 0))
+    .slice(0, 4);
+
   return (
     <div>
       <section className="hero">
-        <span className="hero-label">Cocktail recipe platform</span>
 
         <h1 className="hero-title">
           Discover your next <span>favorite drink</span>
@@ -66,13 +79,57 @@ function Home() {
         </div>
       </section>
 
+      <section className="best-cocktail-section">
+        {bestCocktail ? (
+          <div className="best-cocktail-content">
+            <div className="best-cocktail-text">
+              <p className="best-cocktail-label">
+                Best cocktail of all time
+              </p>
+
+              <h2 className="best-cocktail-name">
+                {bestCocktail.name}
+              </h2>
+
+              <div className="best-cocktail-stats">
+                <p>
+                  Rating: <strong>★ {bestCocktail.avg_rating}</strong>
+                </p>
+
+                <p>
+                  Reviews: <strong>{bestCocktail.review_count}</strong>
+                </p>
+              </div>
+
+              <Link
+                className="primary-link"
+                to={`/cocktails/${bestCocktail.id}`}
+              >
+                View cocktail
+              </Link>
+            </div>
+
+            {bestCocktail.image_url && (
+              <div className="best-cocktail-image">
+                <img
+                  src={`http://localhost:5000${bestCocktail.image_url}`}
+                  alt={bestCocktail.name}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <p>No cocktails found.</p>
+        )}
+      </section>
+
       <h2>Top rated cocktails</h2>
 
-      {topCocktails.length === 0 ? (
+      {topRatedCocktails.length === 0 ? (
         <p>No cocktails found.</p>
       ) : (
         <div className="cocktail-grid">
-          {topCocktails.map((cocktail) => (
+          {topRatedCocktails.map((cocktail) => (
             <CocktailCard key={cocktail.id} cocktail={cocktail} />
           ))}
         </div>

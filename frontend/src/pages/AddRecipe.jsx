@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   createRecipe,
   getAlcoholTypes,
   getCocktails,
   getDifficulties,
-  getSavedUser
+  getSavedUser,
+  getRecipeDetails
 } from '../services/api';
 
 function formatOptionLabel(text) {
@@ -19,23 +20,56 @@ function formatOptionLabel(text) {
     .join('-');
 }
 
+function ingredientsToText(ingredients) {
+  if (!ingredients || !Array.isArray(ingredients)) {
+    return '';
+  }
+
+  return ingredients
+    .map((ingredient) => {
+      return [
+        ingredient.name,
+        ingredient.quantity,
+        ingredient.unit
+      ]
+        .filter(Boolean)
+        .join(', ');
+    })
+    .join('\n');
+}
+
+function stepsToText(steps) {
+  if (!steps || !Array.isArray(steps)) {
+    return '';
+  }
+
+  return steps
+    .map((step) => step.text || step.description || '')
+    .filter((text) => text !== '')
+    .join('\n');
+}
+
+const emptyFormData = {
+  cocktail_id: '',
+  name: '',
+  description: '',
+  difficulty_id: '',
+  alcohol_type_id: '',
+  ingredientsText: '',
+  stepsText: ''
+};
+
 function AddRecipe() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const twistFrom = searchParams.get('twistFrom');
   const user = getSavedUser();
 
   const [cocktails, setCocktails] = useState([]);
   const [difficulties, setDifficulties] = useState([]);
   const [alcoholTypes, setAlcoholTypes] = useState([]);
 
-  const [formData, setFormData] = useState({
-    cocktail_id: '',
-    name: '',
-    description: '',
-    difficulty_id: '',
-    alcohol_type_id: '',
-    ingredientsText: '',
-    stepsText: ''
-  });
+  const [formData, setFormData] = useState(emptyFormData);
 
   const [image, setImage] = useState(null);
   const [error, setError] = useState('');
@@ -57,6 +91,43 @@ function AddRecipe() {
 
     loadData();
   }, []);
+
+  useEffect(() => {
+    async function loadTwistRecipe() {
+      if (!twistFrom) {
+        setFormData(emptyFormData);
+        setImage(null);
+        setError('');
+        return;
+      }
+
+      try {
+        const data = await getRecipeDetails(twistFrom);
+
+        const recipe = data.recipe ? data.recipe : data;
+        const ingredients = data.ingredients || recipe.ingredients || [];
+        const steps = data.steps || recipe.steps || [];
+
+        setFormData({
+          cocktail_id: recipe.cocktail_id ? String(recipe.cocktail_id) : '',
+          name: '',
+          description: recipe.description || '',
+          difficulty_id: '',
+          alcohol_type_id: '',
+          ingredientsText: ingredientsToText(ingredients),
+          stepsText: stepsToText(steps)
+        });
+
+        setImage(null);
+        setError('');
+      } catch (err) {
+        console.error(err);
+        setError('Could not load recipe for twist.');
+      }
+    }
+
+    loadTwistRecipe();
+  }, [twistFrom]);
 
   function handleChange(event) {
     setFormData({
@@ -139,7 +210,7 @@ function AddRecipe() {
 
   return (
     <div>
-      <h1>Add recipe</h1>
+      <h1>{twistFrom ? 'Add your twist' : 'Add recipe'}</h1>
 
       {error && <p>{error}</p>}
 

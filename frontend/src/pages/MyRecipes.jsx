@@ -65,39 +65,41 @@ function MyRecipes() {
         <p>You do not have recipes yet.</p>
       ) : (
         recipes.map((recipe) => (
-          <div key={recipe.id}>
-            <h3>{recipe.name}</h3>
+          <div className="feature-card image-right-card" key={recipe.id}>
+            <div className="image-right-text">
+              <h3>{recipe.name}</h3>
+
+              {recipe.cocktail_name && (
+                <p>Connected cocktail: {recipe.cocktail_name}</p>
+              )}
+
+              {recipe.description && <p>{recipe.description}</p>}
+
+              <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
+
+              {' | '}
+
+              <Link to={`/edit-recipe/${recipe.id}`}>Edit</Link>
+
+              {' | '}
+
+              <button
+                className='delete-button'
+                type="button"
+                onClick={() => handleDelete(recipe.id)}
+              >
+                Delete
+              </button>
+            </div>
 
             {recipe.image_url && (
-              <img
-                src={`http://localhost:5000${recipe.image_url}`}
-                alt={recipe.name}
-                width="200"
-              />
+              <div className="image-right-img">
+                <img
+                  src={`http://localhost:5000${recipe.image_url}`}
+                  alt={recipe.name}
+                />
+              </div>
             )}
-
-            {recipe.cocktail_name && (
-              <p>Connected cocktail: {recipe.cocktail_name}</p>
-            )}
-
-            {recipe.description && <p>{recipe.description}</p>}
-
-            <Link to={`/recipes/${recipe.id}`}>View recipe</Link>
-
-            {' | '}
-
-            <Link to={`/edit-recipe/${recipe.id}`}>Edit</Link>
-
-            {' | '}
-
-            <button
-            type="button"
-            onClick={() => handleDelete(recipe.id)}
-            >
-            Delete
-            </button>
-
-            <hr />
           </div>
         ))
       )}

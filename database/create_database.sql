@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS alcohol_types CASCADE;
 DROP TABLE IF EXISTS difficulties CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS recipe_comments CASCADE;
 
 CREATE TABLE roles (
   id SERIAL PRIMARY KEY,
@@ -64,8 +65,6 @@ CREATE TABLE reviews (
   id SERIAL PRIMARY KEY,
   text TEXT,
   rate INT NOT NULL CHECK (rate BETWEEN 1 AND 5),
-  sweet_rate INT CHECK (sweet_rate BETWEEN 1 AND 5),
-  bitter_rate INT CHECK (bitter_rate BETWEEN 1 AND 5),
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   cocktail_id INT NOT NULL REFERENCES cocktails(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +92,14 @@ CREATE TABLE recipe_ingredients (
   quantity VARCHAR(50),
   unit VARCHAR(30),
   PRIMARY KEY (recipe_version_id, ingredient_id)
+);
+
+CREATE TABLE recipe_comments (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipe_version_id INTEGER NOT NULL REFERENCES recipe_versions(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE steps (
