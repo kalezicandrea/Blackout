@@ -64,9 +64,7 @@ const uploadRecipeImage = multer({
   storage: recipeImageStorage
 });
 
-// =======================
-// AUTH HELPERS
-// =======================
+/* AUTHORIZATION */
 
 function createToken(user) {
   return jwt.sign(
@@ -131,9 +129,7 @@ async function getLoggedUser(req) {
   }
 }
 
-// =======================
-// AUTH ROUTES
-// =======================
+/* AUTHORIZATION ROUTES */
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -260,9 +256,7 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
-// =======================
-// COCKTAIL ROUTES
-// =======================
+/* COCKTAIL ROUTES */
 
 app.get('/api/cocktails', async (req, res) => {
   try {
@@ -365,90 +359,6 @@ app.get('/api/cocktails', async (req, res) => {
     res.status(500).json({ message: 'Cocktail search/filter error' });
   }
 });
-
-// app.get('/api/cocktails', async (req, res) => {
-//   try {
-//     const {
-//       search,
-//       difficulty,
-//       alcohol_type,
-//       ingredient,
-//       min_rating,
-//       sort
-//     } = req.query;
-
-//     console.log('SORT:', sort);
-
-//     let query = `
-//       SELECT DISTINCT
-//         c.id,
-//         c.name,
-//         c.image_url,
-//         c.avg_rating,
-//         c.review_count,
-//         CASE WHEN c.review_count = 0 THEN 1 ELSE 0 END AS no_reviews_sort,
-//         d.name AS difficulty,
-//         a.name AS alcohol_type
-//       FROM cocktails c
-//       JOIN difficulties d ON c.difficulty_id = d.id
-//       JOIN alcohol_types a ON c.alcohol_type_id = a.id
-//       LEFT JOIN recipe_versions rv ON rv.cocktail_id = c.id
-//       LEFT JOIN recipe_ingredients ri ON ri.recipe_version_id = rv.id
-//       LEFT JOIN ingredients i ON i.id = ri.ingredient_id
-//       WHERE 1 = 1
-//     `;
-
-//     const values = [];
-
-//     if (search) {
-//       values.push(`%${search}%`);
-//       query += ` AND c.name ILIKE $${values.length}`;
-//     }
-
-//     if (difficulty) {
-//       values.push(difficulty);
-//       query += ` AND d.name = $${values.length}`;
-//     }
-
-//     if (alcohol_type) {
-//       values.push(alcohol_type);
-//       query += ` AND a.name = $${values.length}`;
-//     }
-
-//     if (ingredient) {
-//       values.push(`%${ingredient}%`);
-//       query += ` AND i.name ILIKE $${values.length}`;
-//     }
-
-//     if (min_rating) {
-//       values.push(min_rating);
-//       query += ` AND c.avg_rating >= $${values.length}`;
-//     }
-
-//     if (sort === 'popular') {
-//       query += ` ORDER BY c.review_count DESC, c.avg_rating DESC`;
-//     } else if (sort === 'rating') {
-//       query += ` ORDER BY c.avg_rating DESC, c.review_count DESC`;
-//     } else if (sort === 'rating_low') {
-//        query += `
-//           ORDER BY
-//             CASE WHEN COALESCE(c.review_count, 0) = 0 THEN 1 ELSE 0 END ASC,
-//             COALESCE(NULLIF(c.avg_rating::text, '')::numeric, 0) ASC,
-//             COALESCE(c.review_count, 0) DESC,
-//             c.name ASC
-//         `;
-//     } else {
-//       query += ` ORDER BY c.name ASC`;
-//     }
-
-//     const result = await pool.query(query, values);
-
-//     res.json(result.rows);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: 'Cocktail search/filter error' });
-//   }
-// });
 
 app.get('/api/cocktails/random', async (req, res) => {
   try {
@@ -591,9 +501,7 @@ app.get('/api/cocktails/:id', async (req, res) => {
   }
 });
 
-// =======================
-// FAVORITE ROUTES
-// =======================
+/* FAVORITE ROUTES */
 
 app.get('/api/favorites', async (req, res) => {
   try {
@@ -691,9 +599,7 @@ app.delete('/api/favorites/:cocktailId', async (req, res) => {
   }
 });
 
-// =======================
-// REVIEW ROUTES
-// =======================
+/* REVIEW ROUTES */
 
 async function updateCocktailRating(cocktailId) {
   const ratingResult = await pool.query(
@@ -852,9 +758,7 @@ app.delete('/api/reviews/:reviewId', async (req, res) => {
   }
 });
 
-// =======================
-// RECIPE HELPERS
-// =======================
+/* RECIPE */
 
 function parseJsonArray(value) {
   if (!value) {
@@ -897,9 +801,7 @@ async function getOrCreateIngredient(name) {
   return newIngredient.rows[0].id;
 }
 
-// =======================
-// RECIPE ROUTES
-// =======================
+/* RECIPE ROUTES */
 
 app.get('/api/recipes/my', async (req, res) => {
   try {
@@ -1466,9 +1368,7 @@ app.delete('/api/recipe-comments/:commentId', async (req, res) => {
   }
 });
 
-// =======================
-// ADMIN HELPERS
-// =======================
+/* ADMIN */
 
 async function getAdminUser(req, res) {
   const user = await getLoggedUser(req);
@@ -1486,9 +1386,7 @@ async function getAdminUser(req, res) {
   return user;
 }
 
-// =======================
-// ADMIN ROUTES
-// =======================
+/* ADMIN ROUTES */
 
 app.get('/api/admin/users', async (req, res) => {
   try {
@@ -1589,9 +1487,7 @@ app.get('/api/admin/recipes', async (req, res) => {
   }
 });
 
-// =======================
-// ADMIN COCKTAIL ROUTES
-// =======================
+/* ADMIN COCKTAIL ROUTES */
 
 app.post('/api/admin/cocktails', uploadCocktailImage.single('image'), async (req, res) => {
   try {
@@ -1716,9 +1612,7 @@ app.delete('/api/admin/cocktails/:id', async (req, res) => {
   }
 });
 
-// =======================
-// LOOKUP ROUTES
-// =======================
+/* LOOKUP ROUTES */
 
 app.get('/api/lookups/difficulties', async (req, res) => {
   try {

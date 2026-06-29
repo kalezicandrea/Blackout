@@ -218,7 +218,7 @@ a:hover {
   margin-right: 10px;
 }
 
-/* TEXT */
+/* TEKST */
 
 h1 {
   margin: 0 0 18px;
@@ -260,7 +260,7 @@ hr {
   );
 }
 
-/* BUTTONS + INPUTS */
+/* BUTTONS i INPUTS */
 
 button,
 .primary-link,
@@ -381,7 +381,7 @@ ol {
   line-height: 1.8;
 }
 
-/* HOME HERO */
+/* HOME */
 
 .hero {
   position: relative;
@@ -423,22 +423,6 @@ ol {
     inset 0 -80px 90px rgba(0, 0, 0, 0.42);
 }
 
-/* .hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent),
-    repeating-linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.025) 0px,
-      rgba(255, 255, 255, 0.025) 1px,
-      transparent 1px,
-      transparent 18px
-    );
-  pointer-events: none;
-} */
-
 .hero::before {
   content: "";
   position: absolute;
@@ -452,33 +436,11 @@ ol {
   z-index: 0;
 }
 
-/* .hero > * {
-  position: relative;
-} */
-
 .hero > * {
   position: relative;
   z-index: 1;
 }
 
-/* .hero-label {
-  display: inline-block;
-  margin-bottom: 16px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(2, 6, 23, 0.55);
-  color: #a7f3d0;
-  border: 1px solid rgba(167, 243, 208, 0.25);
-  font-size: 14px;
-  font-weight: 900;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-} */
-
-/* .hero-title {
-  margin-bottom: 18px;
-  text-shadow: 0 10px 35px rgba(0, 0, 0, 0.55);
-} */
  .hero-title {
   max-width: 850px;
   margin-bottom: 18px;
@@ -492,12 +454,6 @@ ol {
   color: #34d399;
   text-shadow: 0 0 24px rgba(52, 211, 153, 0.45);
 }
-
-/* .hero-text {
-  max-width: 780px;
-  font-size: 18px;
-  color: #d1d5db;
-} */
 
 .hero-text {
   max-width: 720px;
@@ -514,7 +470,7 @@ ol {
   align-items: center;
 }
 
-/* OVO RJEŠAVA DA SVA TRI HERO DUGMETA IMAJU ISTI FONT I ISTU VELIČINU */
+/* home buttons ona tri */
 
 .hero-actions .primary-link,
 .hero-actions .secondary-link,
@@ -558,13 +514,6 @@ ol {
 
 /* CARDS */
 
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 22px;
-}
-
 .feature-card {
   padding: 22px;
   margin: 20px 0px;
@@ -602,7 +551,6 @@ ol {
   object-fit: cover;
 }
 
-/* za telefon da slika ipak ode ispod */
 @media (max-width: 750px) {
   .image-right-card {
     flex-direction: column;
@@ -613,6 +561,8 @@ ol {
     height: 220px;
   }
 }
+
+/* kokteli kartice tiket */
 
 .cocktail-grid {
   display: grid;
@@ -692,7 +642,7 @@ ol {
   z-index: 5;
 }
 
-/* bočni zarezi kao na karti/računu */
+/* zarezi sa strane */
 .ticket-dashed-line {
   position: relative;
   margin: 14px 0;
@@ -763,18 +713,6 @@ ol {
   border: none;
   border-radius: 0;
   filter: saturate(0.9) contrast(1.08);
-}
-
-.ticket-no-image {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  color: rgba(32, 20, 7, 0.7);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .ticket-details {
@@ -866,7 +804,7 @@ ol {
   font-size: 12px;
 }
 
-/* FOOTER */
+/* footer ikonice i to */
 
 .footer {
   padding: 28px 0;
@@ -936,8 +874,6 @@ ol {
   color: #ecfdf5;
   background: rgba(16, 185, 129, 0.2);
 }
-
-/* RESPONSIVE */
 
 @media (max-width: 850px) {
   .navbar-inner {
@@ -1275,7 +1211,6 @@ ol {
   padding: 5px 8px;
   font-size: 14px;
   background:
-    /* linear-gradient(135deg, rgba(78, 112, 23, 0.95), rgba(185, 193, 23, 0.95)); */
     linear-gradient(135deg, rgba(112, 23, 48, 0.95), rgba(193, 23, 74, 0.95));
   border-color: rgba(254, 202, 202, 0.25);
 }

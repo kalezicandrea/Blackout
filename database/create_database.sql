@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS step_ingredients CASCADE;
 DROP TABLE IF EXISTS steps CASCADE;
 DROP TABLE IF EXISTS recipe_ingredients CASCADE;
 DROP TABLE IF EXISTS recipe_versions CASCADE;
@@ -108,12 +107,6 @@ CREATE TABLE steps (
   step_number INT NOT NULL,
   text TEXT NOT NULL,
   UNIQUE (recipe_version_id, step_number)
-);
-
-CREATE TABLE step_ingredients (
-  step_id INT NOT NULL REFERENCES steps(id) ON DELETE CASCADE,
-  ingredient_id INT NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-  PRIMARY KEY (step_id, ingredient_id)
 );
 
 CREATE INDEX idx_cocktails_name ON cocktails(name);
