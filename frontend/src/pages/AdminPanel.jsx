@@ -363,7 +363,7 @@ function AdminPanel() {
               </div>
 
               <div className="ticket-admin-actions">
-                <Link className="view-button" to={`/cocktails/${cocktail.id}`}>View</Link>
+                <Link className="view-edit-button" to={`/cocktails/${cocktail.id}`}>View</Link>
 
                 <button
                   type="button"
