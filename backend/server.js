@@ -64,7 +64,7 @@ const uploadRecipeImage = multer({
   storage: recipeImageStorage
 });
 
-/* AUTHORIZATION */
+/* AUTHORIZATION - tokeni uzimanje korisnika ulogovanog */
 
 function createToken(user) {
   return jwt.sign(
@@ -448,6 +448,142 @@ app.get('/api/cocktails/by-ingredients/search', async (req, res) => {
   }
 });
 
+app.get('/api/cocktails/my', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.name,
+        c.image_url,
+        c.avg_rating,
+        c.review_count,
+        c.difficulty_id,
+        c.alcohol_type_id,
+        d.name AS difficulty,
+        a.name AS alcohol_type
+      FROM cocktails c
+      JOIN difficulties d ON c.difficulty_id = d.id
+      JOIN alcohol_types a ON c.alcohol_type_id = a.id
+      WHERE c.created_by_user_id = $1
+      ORDER BY c.created_at DESC
+      `,
+      [user.id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'My cocktails error' });
+  }
+});
+
+app.put('/api/cocktails/:id', uploadCocktailImage.single('image'), async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const cocktailId = req.params.id;
+    const { name, difficulty_id, alcohol_type_id } = req.body;
+
+    const cocktailResult = await pool.query(
+      'SELECT * FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    if (cocktailResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Cocktail not found' });
+    }
+
+    const cocktail = cocktailResult.rows[0];
+
+    if (user.role !== 'admin' && Number(cocktail.created_by_user_id) !== Number(user.id)) {
+      return res.status(403).json({
+        message: 'You can edit only your own cocktails'
+      });
+    }
+
+    const imageUrl = req.file
+      ? `/uploads/cocktails/${req.file.filename}`
+      : cocktail.image_url;
+
+    const result = await pool.query(
+      `
+      UPDATE cocktails
+      SET name = $1,
+          image_url = $2,
+          difficulty_id = $3,
+          alcohol_type_id = $4
+      WHERE id = $5
+      RETURNING *
+      `,
+      [
+        name || cocktail.name,
+        imageUrl,
+        difficulty_id || cocktail.difficulty_id,
+        alcohol_type_id || cocktail.alcohol_type_id,
+        cocktailId
+      ]
+    );
+
+    res.json({
+      message: 'Cocktail updated successfully',
+      cocktail: result.rows[0]
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Update cocktail error' });
+  }
+});
+
+app.delete('/api/cocktails/:id', async (req, res) => {
+  try {
+    const user = await getLoggedUser(req);
+
+    if (!user) {
+      return res.status(401).json({ message: 'You must be logged in' });
+    }
+
+    const cocktailId = req.params.id;
+
+    const cocktailResult = await pool.query(
+      'SELECT * FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    if (cocktailResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Cocktail not found' });
+    }
+
+    const cocktail = cocktailResult.rows[0];
+
+    if (user.role !== 'admin' && Number(cocktail.created_by_user_id) !== Number(user.id)) {
+      return res.status(403).json({
+        message: 'You can delete only your own cocktails'
+      });
+    }
+
+    await pool.query(
+      'DELETE FROM cocktails WHERE id = $1',
+      [cocktailId]
+    );
+
+    res.json({ message: 'Cocktail deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Delete cocktail error' });
+  }
+});
+
 app.get('/api/cocktails/:id', async (req, res) => {
   try {
     const cocktailId = req.params.id;
@@ -460,6 +596,7 @@ app.get('/api/cocktails/:id', async (req, res) => {
         c.image_url,
         c.avg_rating,
         c.review_count,
+        c.created_by_user_id,
         d.name AS difficulty,
         a.name AS alcohol_type
       FROM cocktails c
@@ -758,7 +895,7 @@ app.delete('/api/reviews/:reviewId', async (req, res) => {
   }
 });
 
-/* RECIPE */
+/* RECIPE recepti sve */
 
 function parseJsonArray(value) {
   if (!value) {

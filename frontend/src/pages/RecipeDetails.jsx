@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getRecipeDetails, getSavedUser, getRecipeComments, saveRecipeComment, deleteRecipeComment } from '../services/api';
+import { 
+  getRecipeDetails, 
+  getSavedUser, 
+  getRecipeComments, 
+  saveRecipeComment, 
+  deleteRecipeComment ,
+  deleteRecipe
+} from '../services/api';
 
 function RecipeDetails() {
   const { id } = useParams();
@@ -10,6 +17,8 @@ function RecipeDetails() {
   const [steps, setSteps] = useState([]);
 
   const user = getSavedUser();
+
+  const isOwner = user && recipe && (Number(user.id) === Number(recipe.user_id) || user.role === 'admin');
 
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
@@ -93,6 +102,23 @@ function RecipeDetails() {
     }
   }
 
+  async function handleDeleteRecipe() {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this recipe?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteRecipe(recipe.id);
+      window.location.href = '/my-recipes';
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <Link to={recipe.cocktail_id ? `/cocktails/${recipe.cocktail_id}` : '/cocktails'}>
@@ -102,6 +128,22 @@ function RecipeDetails() {
       <div className="feature-card image-right-card recipe-detail-main">
         <div className="image-right-text">
           <h1>{recipe.name}</h1>
+
+          {isOwner && (
+            <div className="details-actions">
+              <Link className="view-edit-button" to={`/edit-recipe/${recipe.id}`}>
+                Edit
+              </Link>
+
+              <button
+                className="delete-button"
+                type="button"
+                onClick={handleDeleteRecipe}
+              >
+                Delete
+              </button>
+            </div>
+          )}
 
           {recipe.cocktail_name && (
             <p>Cocktail: {recipe.cocktail_name}</p>

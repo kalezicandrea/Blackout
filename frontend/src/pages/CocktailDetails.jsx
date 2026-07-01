@@ -8,7 +8,8 @@ import {
   getFavorites,
   getSavedUser,
   saveReview,
-  deleteReview
+  deleteReview,
+  deleteMyCocktail
 } from '../services/api';
 
 function formatOptionLabel(text) {
@@ -33,6 +34,9 @@ function CocktailDetails() {
   const [error, setError] = useState('');
 
   const user = getSavedUser();
+
+  const isOwner = user && cocktail && (Number(user.id) === Number(cocktail.created_by_user_id) || user.role === 'admin');
+
   const [favoriteMessage, setFavoriteMessage] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -160,6 +164,23 @@ async function handleDeleteReview(reviewId) {
   }
 }
 
+async function handleDeleteCocktail() {
+  const confirmed = window.confirm(
+    'Are you sure you want to delete this cocktail? All recipes connected to it will also be deleted.'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await deleteMyCocktail(cocktail.id);
+    window.location.href = '/my-recipes';
+  } catch (err) {
+    setError(err.message);
+  }
+}
+
 if (loading) {
     return <p>Loading cocktail details...</p>;
 }
@@ -179,6 +200,22 @@ return (
         <div className="cocktail-detail-highlight image-right-card">
         <div className="image-right-text">
             <h1>{cocktail.name}</h1>
+
+            {isOwner && (
+              <div className="details-actions">
+                <Link className="view-edit-button" to="/my-recipes">
+                  Edit
+                </Link>
+
+                <button
+                  className="delete-button"
+                  type="button"
+                  onClick={handleDeleteCocktail}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
 
             <p>Difficulty: {formatOptionLabel(cocktail.difficulty)}</p>
             <p>Type: {formatOptionLabel(cocktail.alcohol_type)}</p>

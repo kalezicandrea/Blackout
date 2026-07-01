@@ -363,6 +363,8 @@ function AdminPanel() {
               </div>
 
               <div className="ticket-admin-actions">
+                <Link className="view-button" to={`/cocktails/${cocktail.id}`}>View</Link>
+
                 <button
                   type="button"
                   onClick={() => handleEditCocktail(cocktail)}

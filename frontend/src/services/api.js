@@ -518,3 +518,60 @@ export async function getOriginalRecipes() {
 
   return response.json();
 }
+
+export async function getMyCocktails() {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/cocktails/my`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to fetch my cocktails');
+  }
+
+  return data;
+}
+
+export async function updateMyCocktail(id, formData) {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/cocktails/${id}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to update cocktail');
+  }
+
+  return data;
+}
+
+export async function deleteMyCocktail(id) {
+  const token = getToken();
+
+  const response = await fetch(`${API_URL}/cocktails/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to delete cocktail');
+  }
+
+  return data;
+}
